@@ -1,0 +1,31 @@
+{
+  "expo": {
+    "name": "Inkwell",
+    "slug": "inkwell",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "inkwell",
+    "owner": "boyscout1970",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.inkwelljournal.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Inkwell lets you attach photos from your library to journal entries. Photos are copied into the app and never leave your device."
+      }
+    },
+    "android": {
+      "package": "com.inkwelljournal.app",
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Inkwell lets you attach photos from your library to journal entries. Photos are copied into the app and never leave your device."
+        }
+      ]
+    ]
+  }
+}
