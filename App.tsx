@@ -1,11 +1,14 @@
 import { useEffect, useState } from 'react';
+import { Linking } from 'react-native';
 import JournalScreen from './src/screens/JournalScreen';
 import CalendarScreen from './src/screens/CalendarScreen';
 import EditorScreen from './src/screens/EditorScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
+import LockGate from './src/components/LockGate';
 import { SettingsProvider, useSettings } from './src/SettingsContext';
 import { initPurchases } from './src/proAccess';
+import './src/notifications'; // installs the foreground notification handler
 
 type Screen =
   | { name: 'journal' }
@@ -16,6 +19,37 @@ type Screen =
 function Root() {
   const { settings, loaded } = useSettings();
   const [screen, setScreen] = useState<Screen>({ name: 'journal' });
+
+  // Deep links: inkwell://goto/<journal|calendar|settings|today|entry?id=N&day=K>.
+  // Used by the screenshot pipeline; harmless in normal use (just navigation).
+  useEffect(() => {
+    const handle = (url: string | null) => {
+      const m = url ? /goto\/(\w+)(?:\?(.*))?/.exec(url) : null;
+      if (!m) return;
+      const q = new URLSearchParams(m[2] ?? '');
+      if (m[1] === 'journal') setScreen({ name: 'journal' });
+      else if (m[1] === 'calendar') setScreen({ name: 'calendar' });
+      else if (m[1] === 'settings') setScreen({ name: 'settings' });
+      else if (m[1] === 'today')
+        setScreen({
+          name: 'editor',
+          entryId: null,
+          dayKey: new Date().toISOString().slice(0, 10),
+          from: 'journal',
+        });
+      else if (m[1] === 'entry' && q.get('id') && q.get('day'))
+        setScreen({
+          name: 'editor',
+          entryId: Number(q.get('id')),
+          dayKey: q.get('day')!,
+          from: 'journal',
+        });
+    };
+    Linking.getInitialURL().then(handle).catch(() => {});
+    const sub = Linking.addEventListener('url', (e) => handle(e.url));
+    return () => sub.remove();
+  }, []);
+
   if (!loaded) return null;
   if (!settings.onboarded) return <OnboardingScreen />;
 
@@ -67,7 +101,9 @@ export default function App() {
   }, []);
   return (
     <SettingsProvider>
-      <Root />
+      <LockGate>
+        <Root />
+      </LockGate>
     </SettingsProvider>
   );
 }

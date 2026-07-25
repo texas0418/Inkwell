@@ -1,13 +1,16 @@
 // src/screens/EditorScreen.tsx
 // Write or edit one entry. Back = save (a journal never loses writing);
 // a brand-new entry that is still completely empty is simply not created.
-// Photos: free tier = one per entry; Pro = unlimited (fail-open in dev).
+// Date & time are editable (tap the header date). Photos and drawings share
+// one attachment row and one limit: free tier = one per entry, Pro = unlimited
+// (fail-open in dev).
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Image,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -27,10 +30,21 @@ import {
   listPhotosForEntry,
   updateEntry,
 } from '../db';
-import { MOODS, Mood, formatDayLabel } from '../models';
+import {
+  MOODS,
+  Mood,
+  countWords,
+  extractUrls,
+  formatClock,
+  formatDayLabel,
+  linkHref,
+  promptForDay,
+} from '../models';
 import { deletePhotoFile, importPhotoFile, photoUri } from '../photos';
 import { useProAccess, purchasePro } from '../proAccess';
-import { colors, serif } from '../theme';
+import { Palette, ThemeFonts, useTheme } from '../theme';
+import DateTimeSheet from '../components/DateTimeSheet';
+import DrawingSheet from '../components/DrawingSheet';
 
 interface PhotoDraft {
   rowId?: number; // set once persisted
@@ -45,12 +59,19 @@ export default function EditorScreen(props: {
   onDone: () => void;
 }) {
   const pro = useProAccess();
-  const [entryId, setEntryId] = useState<number | null>(props.entryId);
+  const { colors: c, fonts, statusBarStyle } = useTheme();
+  const styles = useMemo(() => makeStyles(c, fonts), [c, fonts]);
+  const [entryId] = useState<number | null>(props.entryId);
+  const [dayKey, setDayKey] = useState(props.dayKey);
+  const [createdAtMs, setCreatedAtMs] = useState<number>(() => Date.now());
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [mood, setMood] = useState<Mood | null>(null);
+  const [pinned, setPinned] = useState(false);
   const [photos, setPhotos] = useState<PhotoDraft[]>([]);
   const [loaded, setLoaded] = useState(props.entryId == null);
+  const [showDateSheet, setShowDateSheet] = useState(false);
+  const [showDrawing, setShowDrawing] = useState(false);
 
   useEffect(() => {
     if (props.entryId == null) return;
@@ -59,6 +80,9 @@ export default function EditorScreen(props: {
       setTitle(e.title);
       setBody(e.body);
       setMood(e.mood);
+      setPinned(e.pinned);
+      setDayKey(e.dayKey);
+      setCreatedAtMs(e.createdAtMs);
       setPhotos(
         listPhotosForEntry(props.entryId).map((p) => ({
           rowId: p.id,
@@ -74,17 +98,23 @@ export default function EditorScreen(props: {
   const isEmpty =
     title.trim() === '' && body.trim() === '' && photos.length === 0 && mood == null;
 
+  const words = countWords(body) + countWords(title);
+  const urls = useMemo(() => extractUrls(body), [body]);
+  const prompt = useMemo(() => promptForDay(dayKey), [dayKey]);
+  const showPrompt = entryId == null && title === '' && body === '';
+
   const saveAndClose = () => {
     const now = Date.now();
     if (entryId == null) {
       if (!isEmpty) {
         const id = insertEntry({
-          dayKey: props.dayKey,
-          createdAtMs: now,
+          dayKey,
+          createdAtMs,
           updatedAtMs: now,
           title: title.trim(),
           body,
           mood,
+          pinned,
         });
         photos.forEach((p, i) =>
           insertPhoto(id, {
@@ -98,12 +128,13 @@ export default function EditorScreen(props: {
     } else {
       updateEntry({
         id: entryId,
-        dayKey: props.dayKey,
-        createdAtMs: 0, // not part of UPDATE
+        dayKey,
+        createdAtMs,
         updatedAtMs: now,
         title: title.trim(),
         body,
         mood,
+        pinned,
       });
     }
     props.onDone();
@@ -127,7 +158,7 @@ export default function EditorScreen(props: {
   const showPaywall = () => {
     Alert.alert(
       'Inkwell Pro',
-      'Free includes one photo per entry. Unlock Pro once — no subscription, ever — for unlimited photos.',
+      'Free includes one photo or drawing per entry. Unlock Pro once — $9.99, no subscription, ever — for unlimited attachments.',
       [
         { text: 'Not now', style: 'cancel' },
         {
@@ -146,11 +177,35 @@ export default function EditorScreen(props: {
     );
   };
 
-  const addPhotos = async () => {
+  const attachmentRoomLeft = (): boolean => {
     if (!pro && photos.length >= 1) {
       showPaywall();
-      return;
+      return false;
     }
+    return true;
+  };
+
+  /** Copy a picked/drawn file in and register the draft (and row if saved). */
+  const addAttachment = async (srcUri: string, w: number, h: number) => {
+    try {
+      const fileName = await importPhotoFile(srcUri);
+      const draft: PhotoDraft = { fileName, width: w, height: h };
+      if (entryId != null) {
+        draft.rowId = insertPhoto(entryId, {
+          fileName,
+          position: photos.length,
+          width: w,
+          height: h,
+        });
+      }
+      setPhotos((prev) => [...prev, draft]);
+    } catch (e) {
+      console.warn('attachment import failed', e);
+    }
+  };
+
+  const addPhotos = async () => {
+    if (!attachmentRoomLeft()) return;
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
       Alert.alert(
@@ -165,37 +220,14 @@ export default function EditorScreen(props: {
       allowsMultipleSelection: pro,
     });
     if (res.canceled || !res.assets?.length) return;
-
     const room = pro ? res.assets.length : Math.max(0, 1 - photos.length);
-    const picked = res.assets.slice(0, room);
-    const drafts: PhotoDraft[] = [];
-    for (const a of picked) {
-      try {
-        const fileName = await importPhotoFile(a.uri);
-        drafts.push({ fileName, width: a.width ?? 0, height: a.height ?? 0 });
-      } catch (e) {
-        console.warn('photo import failed', e);
-      }
+    for (const a of res.assets.slice(0, room)) {
+      await addAttachment(a.uri, a.width ?? 0, a.height ?? 0);
     }
-    if (!drafts.length) return;
-
-    if (entryId != null) {
-      // Entry exists: persist rows immediately so nothing dangles.
-      const base = photos.length;
-      drafts.forEach((d, i) => {
-        d.rowId = insertPhoto(entryId, {
-          fileName: d.fileName,
-          position: base + i,
-          width: d.width,
-          height: d.height,
-        });
-      });
-    }
-    setPhotos((prev) => [...prev, ...drafts]);
   };
 
   const removePhoto = (draft: PhotoDraft) => {
-    Alert.alert('Remove photo?', undefined, [
+    Alert.alert('Remove this attachment?', undefined, [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Remove',
@@ -216,19 +248,20 @@ export default function EditorScreen(props: {
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <StatusBar style="dark" />
+      <StatusBar style={statusBarStyle} />
       <View style={styles.header}>
         <Pressable onPress={saveAndClose} hitSlop={12}>
           <Text style={styles.backText}>‹ Done</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>{formatDayLabel(props.dayKey, Date.now())}</Text>
-        {entryId != null ? (
-          <Pressable onPress={confirmDelete} hitSlop={12}>
-            <Text style={styles.deleteText}>Delete</Text>
-          </Pressable>
-        ) : (
-          <View style={styles.headerSpacer} />
-        )}
+        <Pressable onPress={() => setShowDateSheet(true)} hitSlop={8}>
+          <Text style={styles.headerTitle}>
+            {formatDayLabel(dayKey, Date.now())} · {formatClock(createdAtMs)}{' '}
+            <Text style={styles.headerEdit}>✎</Text>
+          </Text>
+        </Pressable>
+        <Pressable onPress={() => setPinned((p) => !p)} hitSlop={12}>
+          <Text style={[styles.star, pinned && styles.starOn]}>{pinned ? '★' : '☆'}</Text>
+        </Pressable>
       </View>
 
       <ScrollView
@@ -239,7 +272,7 @@ export default function EditorScreen(props: {
         <TextInput
           style={styles.titleInput}
           placeholder="Title (optional)"
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={c.textMuted}
           value={title}
           onChangeText={setTitle}
           returnKeyType="next"
@@ -260,15 +293,43 @@ export default function EditorScreen(props: {
           ))}
         </View>
 
+        {showPrompt && (
+          <Pressable style={styles.promptCard} onPress={() => setTitle(prompt)}>
+            <Text style={styles.promptLabel}>Today's prompt — tap to use</Text>
+            <Text style={styles.promptText}>{prompt}</Text>
+          </Pressable>
+        )}
+
         <TextInput
           style={styles.bodyInput}
           placeholder="Write about your day…"
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={c.textMuted}
           value={body}
           onChangeText={setBody}
           multiline
           textAlignVertical="top"
         />
+        {words > 0 && <Text style={styles.wordCount}>{words} {words === 1 ? 'word' : 'words'}</Text>}
+
+        {urls.length > 0 && (
+          <View style={styles.linkRow}>
+            {urls.map((u) => (
+              <Pressable
+                key={u}
+                style={styles.linkChip}
+                onPress={() =>
+                  Linking.openURL(linkHref(u)).catch(() =>
+                    Alert.alert('Could not open link', u),
+                  )
+                }
+              >
+                <Text style={styles.linkText} numberOfLines={1}>
+                  ↗ {u.replace(/^https?:\/\//i, '')}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        )}
 
         <View style={styles.photoRow}>
           {photos.map((p) => (
@@ -283,94 +344,170 @@ export default function EditorScreen(props: {
             <Text style={styles.addPhotoText}>＋</Text>
             <Text style={styles.addPhotoLabel}>Photo</Text>
           </Pressable>
+          <Pressable
+            style={styles.addPhoto}
+            onPress={() => {
+              if (attachmentRoomLeft()) setShowDrawing(true);
+            }}
+          >
+            <Text style={styles.addPhotoText}>✎</Text>
+            <Text style={styles.addPhotoLabel}>Draw</Text>
+          </Pressable>
         </View>
         {!pro && photos.length >= 1 && (
-          <Text style={styles.proHint}>More photos per entry is a Pro feature.</Text>
+          <Text style={styles.proHint}>More attachments per entry is a Pro feature.</Text>
+        )}
+
+        {entryId != null && (
+          <Pressable onPress={confirmDelete} style={styles.deleteRow} hitSlop={8}>
+            <Text style={styles.deleteText}>Delete entry</Text>
+          </Pressable>
         )}
       </ScrollView>
+
+      {showDateSheet && (
+        <DateTimeSheet
+          dayKey={dayKey}
+          timeMs={createdAtMs}
+          onClose={() => setShowDateSheet(false)}
+          onSave={(k, ms) => {
+            setDayKey(k);
+            setCreatedAtMs(ms);
+            setShowDateSheet(false);
+          }}
+        />
+      )}
+      {showDrawing && (
+        <DrawingSheet
+          onClose={() => setShowDrawing(false)}
+          onDone={async (uri) => {
+            setShowDrawing(false);
+            await addAttachment(uri, 0, 0);
+          }}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.bg },
-  header: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  backText: { color: colors.ink, fontSize: 15 },
-  headerTitle: { color: colors.textPrimary, fontSize: 15, fontWeight: '600' },
-  deleteText: { color: colors.danger, fontSize: 14 },
-  headerSpacer: { width: 50 },
-  scroll: { flex: 1 },
-  content: { paddingHorizontal: 20, paddingBottom: 48 },
-  titleInput: {
-    fontFamily: serif,
-    fontSize: 22,
-    color: colors.textPrimary,
-    paddingVertical: 8,
-  },
-  moodRow: { flexDirection: 'row', gap: 10, marginTop: 2, marginBottom: 10 },
-  moodChip: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.card,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-  },
-  moodChipActive: { borderColor: colors.ink, backgroundColor: colors.inkSoft },
-  moodEmoji: { fontSize: 20 },
-  moodDim: { opacity: 0.45 },
-  bodyInput: {
-    minHeight: 220,
-    fontSize: 16,
-    lineHeight: 24,
-    color: colors.textBody,
-    paddingVertical: 6,
-  },
-  photoRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginTop: 16,
-  },
-  photo: {
-    width: 88,
-    height: 88,
-    borderRadius: 10,
-    backgroundColor: colors.hairline,
-  },
-  photoX: {
-    position: 'absolute',
-    top: -6,
-    right: -6,
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    backgroundColor: colors.textPrimary,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  photoXText: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  addPhoto: {
-    width: 88,
-    height: 88,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: colors.inkBorder,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.card,
-  },
-  addPhotoText: { color: colors.ink, fontSize: 22, lineHeight: 26 },
-  addPhotoLabel: { color: colors.ink, fontSize: 12, marginTop: 2 },
-  proHint: { color: colors.textMuted, fontSize: 12, marginTop: 10 },
-});
+const makeStyles = (c: Palette, f: ThemeFonts) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: c.bg },
+    header: {
+      paddingTop: 60,
+      paddingHorizontal: 20,
+      paddingBottom: 10,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    backText: { color: c.accent, fontSize: 15 },
+    headerTitle: { color: c.textPrimary, fontSize: 14, fontWeight: '600' },
+    headerEdit: { color: c.accent, fontSize: 12 },
+    star: { color: c.textMuted, fontSize: 22, width: 28, textAlign: 'right' },
+    starOn: { color: c.proGold },
+    scroll: { flex: 1 },
+    content: { paddingHorizontal: 20, paddingBottom: 48 },
+    titleInput: {
+      fontFamily: f.title,
+      fontSize: 22,
+      color: c.textPrimary,
+      paddingVertical: 8,
+    },
+    moodRow: { flexDirection: 'row', gap: 10, marginTop: 2, marginBottom: 10 },
+    moodChip: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: c.card,
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+    },
+    moodChipActive: { borderColor: c.accent, backgroundColor: c.accentSoft },
+    moodEmoji: { fontSize: 20 },
+    moodDim: { opacity: 0.45 },
+    promptCard: {
+      backgroundColor: c.accentSoft,
+      borderWidth: 1,
+      borderColor: c.accentBorder,
+      borderRadius: 10,
+      padding: 12,
+      marginBottom: 8,
+    },
+    promptLabel: {
+      color: c.accent,
+      fontSize: 10,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 0.6,
+      marginBottom: 3,
+    },
+    promptText: { color: c.textBody, fontSize: 13, fontStyle: 'italic' },
+    bodyInput: {
+      fontFamily: f.body,
+      minHeight: 200,
+      fontSize: 16,
+      lineHeight: 24,
+      color: c.textBody,
+      paddingVertical: 6,
+    },
+    wordCount: {
+      color: c.textMuted,
+      fontSize: 11,
+      textAlign: 'right',
+      fontVariant: ['tabular-nums'],
+    },
+    linkRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+    linkChip: {
+      backgroundColor: c.card,
+      borderWidth: 1,
+      borderColor: c.accentBorder,
+      borderRadius: 16,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+      maxWidth: '100%',
+    },
+    linkText: { color: c.accent, fontSize: 13 },
+    photoRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+      marginTop: 16,
+    },
+    photo: {
+      width: 88,
+      height: 88,
+      borderRadius: 10,
+      backgroundColor: c.hairline,
+    },
+    photoX: {
+      position: 'absolute',
+      top: -6,
+      right: -6,
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: c.textPrimary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    photoXText: { color: c.bg, fontSize: 11, fontWeight: '700' },
+    addPhoto: {
+      width: 88,
+      height: 88,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: c.accentBorder,
+      borderStyle: 'dashed',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: c.card,
+    },
+    addPhotoText: { color: c.accent, fontSize: 22, lineHeight: 26 },
+    addPhotoLabel: { color: c.accent, fontSize: 12, marginTop: 2 },
+    proHint: { color: c.textMuted, fontSize: 12, marginTop: 10 },
+    deleteRow: { marginTop: 28, alignItems: 'center' },
+    deleteText: { color: c.danger, fontSize: 14, fontWeight: '600' },
+  });

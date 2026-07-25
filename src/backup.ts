@@ -54,6 +54,7 @@ export async function exportBackup(): Promise<void> {
       title: entry.title,
       body: entry.body,
       mood: entry.mood,
+      pinned: entry.pinned,
       photos: backupPhotos,
     });
   }
@@ -105,6 +106,7 @@ export async function applyBackup(b: BackupV1): Promise<void> {
         title: e.title,
         body: e.body,
         mood: e.mood,
+        pinned: e.pinned,
       },
       photos,
     });

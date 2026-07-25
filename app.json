@@ -6,7 +6,8 @@
     "orientation": "portrait",
     "scheme": "inkwell",
     "owner": "boyscout1970",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
+    "icon": "./assets/icon.png",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.inkwelljournal.app",
@@ -17,7 +18,11 @@
     },
     "android": {
       "package": "com.inkwelljournal.app",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#223550"
+      }
     },
     "plugins": [
       [
@@ -25,7 +30,16 @@
         {
           "photosPermission": "Inkwell lets you attach photos from your library to journal entries. Photos are copied into the app and never leave your device."
         }
-      ]
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Inkwell uses Face ID to lock your journal so only you can open it."
+        }
+      ],
+      "expo-notifications",
+      "expo-asset",
+      "expo-font"
     ]
   }
 }

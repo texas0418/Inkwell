@@ -26,6 +26,7 @@ export interface BackupEntryV1 {
   title: string;
   body: string;
   mood: Mood | null;
+  pinned: boolean; // added post-v1; parse defaults to false, so still version 1
   photos: BackupPhotoV1[];
 }
 
@@ -100,6 +101,7 @@ export function parseBackup(json: string): BackupV1 {
       title: typeof e.title === 'string' ? e.title : '',
       body: typeof e.body === 'string' ? e.body : '',
       mood: MOOD_KEYS.has(e.mood as string) ? (e.mood as Mood) : null,
+      pinned: e.pinned === true,
       photos,
     });
   }

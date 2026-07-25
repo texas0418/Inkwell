@@ -6,6 +6,7 @@
 import * as SQLite from 'expo-sqlite';
 import type { EntryPhoto, EntryWithPhotos, JournalEntry } from './models';
 import {
+  ALL_DAY_KEYS_SQL,
   ALL_ENTRIES_SQL,
   ALL_PHOTOS_SQL,
   COUNT_ENTRIES_SQL,
@@ -20,8 +21,10 @@ import {
   INSERT_PHOTO_SQL,
   LIST_ENTRIES_FOR_DAY_SQL,
   LIST_PHOTOS_FOR_ENTRY_SQL,
+  LIST_PINNED_SQL,
   LIST_RECENT_ENTRIES_SQL,
   MIGRATIONS,
+  ON_THIS_DAY_SQL,
   PhotoRow,
   SEARCH_ENTRIES_SQL,
   UPDATE_ENTRY_SQL,
@@ -68,14 +71,7 @@ export function insertEntry(e: JournalEntry): number {
 
 export function updateEntry(e: JournalEntry): void {
   if (e.id == null) throw new Error('updateEntry requires id');
-  getDb().runSync(UPDATE_ENTRY_SQL, [
-    e.dayKey,
-    e.updatedAtMs,
-    e.title,
-    e.body,
-    e.mood,
-    e.id,
-  ]);
+  getDb().runSync(UPDATE_ENTRY_SQL, [...entryToParams(e), e.id]);
 }
 
 /** Deletes the entry; photo ROWS cascade. Files are the caller's job
@@ -116,6 +112,27 @@ export function dayCountsForMonth(prefix: string): Record<string, number> {
 export function countEntries(): number {
   const row = getDb().getFirstSync<{ count: number }>(COUNT_ENTRIES_SQL);
   return row?.count ?? 0;
+}
+
+export function listPinnedEntries(): JournalEntry[] {
+  return getDb().getAllSync<EntryRow>(LIST_PINNED_SQL).map(rowToEntry);
+}
+
+/** Entries from the same month-day in earlier years. */
+export function listOnThisDay(todayKey: string): JournalEntry[] {
+  const mmdd = todayKey.slice(5);
+  return getDb().getAllSync<EntryRow>(ON_THIS_DAY_SQL, [mmdd, todayKey]).map(rowToEntry);
+}
+
+/** Distinct written days, newest first (streak input). */
+export function getAllDayKeys(): string[] {
+  return getDb()
+    .getAllSync<{ day_key: string }>(ALL_DAY_KEYS_SQL)
+    .map((r) => r.day_key);
+}
+
+export function getAllEntries(): JournalEntry[] {
+  return getDb().getAllSync<EntryRow>(ALL_ENTRIES_SQL).map(rowToEntry);
 }
 
 // ------------------------------------------------------------------ photos

@@ -12,13 +12,16 @@
 // must equal it character-for-character.
 
 // Public SDK keys (safe to ship in the app bundle — these are NOT secret).
-export const RC_API_KEY_IOS = 'REPLACE_WITH_RC_IOS_KEY'; // starts with "appl_"
+export const RC_API_KEY_IOS = 'appl_LsLAucJFFyEEgWiuNynrzgqzoml'; // RC project "Inkwell"
 export const RC_API_KEY_ANDROID = 'REPLACE_WITH_RC_ANDROID_KEY'; // starts with "goog_"
 
 // The entitlement that grants Pro. CONFIRM on the RC Entitlements page before trusting.
 export const ENTITLEMENT_ID = 'pro';
 
 // The App Store / Play non-consumable product id. Must match App Store Connect exactly.
+// PRICE: $9.99 one-time (App Store Tier 10) — decided 2026-07-25. If this ever
+// changes in ASC, update the hardcoded "$9.99" mentions in SettingsScreen /
+// EditorScreen / JournalScreen paywall copy to match (grep for "9.99").
 export const PRODUCT_ID = 'inkwell_pro_lifetime';
 
 const PLACEHOLDER_KEYS = new Set([

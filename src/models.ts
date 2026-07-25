@@ -27,6 +27,7 @@ export interface JournalEntry {
   title: string;
   body: string;
   mood: Mood | null;
+  pinned: boolean; // marked as important
 }
 
 export interface EntryPhoto {
@@ -114,4 +115,81 @@ export function displayTitle(e: JournalEntry): string {
   if (e.title.trim()) return e.title.trim();
   const s = snippet(e.body, 48);
   return s || 'Untitled';
+}
+
+export function countWords(text: string): number {
+  const m = text.trim().match(/\S+/g);
+  return m ? m.length : 0;
+}
+
+const URL_RE = /\bhttps?:\/\/[^\s<>"')\]]+|\bwww\.[^\s<>"')\]]+/gi;
+
+/** Unique URLs found in a body, trailing punctuation trimmed. */
+export function extractUrls(text: string): string[] {
+  const found = text.match(URL_RE) ?? [];
+  const cleaned = found.map((u) => u.replace(/[.,;:!?]+$/, ''));
+  return [...new Set(cleaned)];
+}
+
+/** Prepend a scheme so Linking.openURL accepts bare www. links. */
+export function linkHref(url: string): string {
+  return /^https?:\/\//i.test(url) ? url : `https://${url}`;
+}
+
+// ------------------------------------------------------------------ habit
+
+export const PROMPTS: string[] = [
+  'What is something you don’t want to forget about today?',
+  'What made you smile today?',
+  'What drained you today — and what refilled you?',
+  'Describe today in three sentences.',
+  'What did you notice today that you usually walk past?',
+  'Who did you talk to today, and what stayed with you?',
+  'What was the best thing you ate or drank today?',
+  'What would you tell yourself this morning, knowing how today went?',
+  'What small thing went right today?',
+  'What are you looking forward to tomorrow?',
+  'What did today teach you, even a little?',
+  'Where were you at 3pm, and what was happening?',
+  'What sound, smell, or light do you remember from today?',
+  'If today had a title, what would it be — and why?',
+];
+
+/** Deterministic prompt for a given day (stable across re-opens). */
+export function promptForDay(dayKey: string): string {
+  let h = 0;
+  for (let i = 0; i < dayKey.length; i++) h = (h * 31 + dayKey.charCodeAt(i)) | 0;
+  return PROMPTS[Math.abs(h) % PROMPTS.length];
+}
+
+export function prevDayKey(key: string): string {
+  const d = dateFromDayKey(key);
+  d.setDate(d.getDate() - 1);
+  return dayKeyFromDate(d);
+}
+
+/** Consecutive written days ending today (or yesterday, so an unwritten
+ *  "today" doesn't zero the streak before the evening). Input: distinct
+ *  dayKeys sorted DESC. */
+export function calcStreak(dayKeysDesc: string[], today: string): number {
+  const days = new Set(dayKeysDesc);
+  let cursor = days.has(today) ? today : prevDayKey(today);
+  let streak = 0;
+  while (days.has(cursor)) {
+    streak++;
+    cursor = prevDayKey(cursor);
+  }
+  return streak;
+}
+
+/** Total words written in entries whose dayKey starts with `yearPrefix`. */
+export function wordsInYear(
+  entries: { dayKey: string; body: string; title: string }[],
+  yearPrefix: string,
+): number {
+  let n = 0;
+  for (const e of entries) {
+    if (e.dayKey.startsWith(yearPrefix)) n += countWords(e.title) + countWords(e.body);
+  }
+  return n;
 }

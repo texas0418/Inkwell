@@ -35,7 +35,8 @@ npm run typecheck
 ## Before shipping (TODO)
 
 - [ ] Confirm final name + bundle id (working title "Inkwell", `com.inkwelljournal.app`)
-- [ ] App icon / splash assets in `assets/`, referenced from `app.json`
+- [x] App icon — "Drop & Ripple" (`assets/icon.png` + `assets/adaptive-icon.png`, wired in `app.json`)
+- [ ] Splash screen art in `assets/`, referenced from `app.json`
 - [ ] Create EAS project (`eas init`) — `app.json` has no `projectId` yet
 - [ ] RevenueCat project + paste public SDK keys into `src/revenuecat.ts`
-- [ ] App Store product `inkwell_pro_lifetime` (non-consumable)
+- [ ] App Store product `inkwell_pro_lifetime` (non-consumable, **$9.99 / Tier 10**)

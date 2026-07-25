@@ -30,6 +30,8 @@ export const MIGRATIONS: string[][] = [
     )`,
     `CREATE INDEX IF NOT EXISTS idx_photos_entry ON photos(entry_id)`,
   ],
+  // v2: mark-as-important flag.
+  [`ALTER TABLE entries ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0`],
 ];
 
 export const TARGET_DB_VERSION = MIGRATIONS.length;
@@ -44,6 +46,7 @@ export interface EntryRow {
   title: string;
   body: string;
   mood: string | null;
+  pinned: number;
 }
 
 export function rowToEntry(r: EntryRow): JournalEntry {
@@ -55,22 +58,31 @@ export function rowToEntry(r: EntryRow): JournalEntry {
     title: r.title ?? '',
     body: r.body ?? '',
     mood: MOOD_KEYS.has(r.mood as string) ? (r.mood as Mood) : null,
+    pinned: r.pinned === 1,
   };
 }
 
 /** Positional params matching INSERT_ENTRY_SQL column order. */
 export function entryToParams(
   e: JournalEntry,
-): [string, number, number, string, string, string | null] {
-  return [e.dayKey, e.createdAtMs, e.updatedAtMs, e.title, e.body, e.mood];
+): [string, number, number, string, string, string | null, number] {
+  return [
+    e.dayKey,
+    e.createdAtMs,
+    e.updatedAtMs,
+    e.title,
+    e.body,
+    e.mood,
+    e.pinned ? 1 : 0,
+  ];
 }
 
 export const INSERT_ENTRY_SQL = `INSERT INTO entries
-  (day_key, created_at_ms, updated_at_ms, title, body, mood)
-  VALUES (?, ?, ?, ?, ?, ?)`;
+  (day_key, created_at_ms, updated_at_ms, title, body, mood, pinned)
+  VALUES (?, ?, ?, ?, ?, ?, ?)`;
 
 export const UPDATE_ENTRY_SQL = `UPDATE entries SET
-  day_key = ?, updated_at_ms = ?, title = ?, body = ?, mood = ?
+  day_key = ?, created_at_ms = ?, updated_at_ms = ?, title = ?, body = ?, mood = ?, pinned = ?
   WHERE id = ?`;
 
 export const DELETE_ENTRY_SQL = `DELETE FROM entries WHERE id = ?`;
@@ -102,6 +114,18 @@ export function likePattern(query: string): string {
   const escaped = query.replace(/[\\%_]/g, (c) => `\\${c}`);
   return `%${escaped}%`;
 }
+
+export const LIST_PINNED_SQL = `SELECT * FROM entries
+  WHERE pinned = 1 ORDER BY day_key DESC, created_at_ms DESC`;
+
+/** Same month-day in earlier years. Params: 'MM-DD', today's dayKey. */
+export const ON_THIS_DAY_SQL = `SELECT * FROM entries
+  WHERE substr(day_key, 6) = ? AND day_key < ?
+  ORDER BY day_key DESC`;
+
+/** Distinct written days, newest first — streak input. */
+export const ALL_DAY_KEYS_SQL = `SELECT DISTINCT day_key FROM entries
+  ORDER BY day_key DESC`;
 
 // ------------------------------------------------------------------ photos
 
