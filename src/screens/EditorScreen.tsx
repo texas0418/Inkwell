@@ -22,6 +22,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import * as ImagePicker from 'expo-image-picker';
 import {
+  countEntries,
   deleteEntry,
   deletePhoto,
   getEntry,
@@ -30,6 +31,7 @@ import {
   listPhotosForEntry,
   updateEntry,
 } from '../db';
+import { maybeAskForReview } from '../review';
 import {
   MOODS,
   Mood,
@@ -124,6 +126,8 @@ export default function EditorScreen(props: {
             height: p.height,
           }),
         );
+        // After the entry is safely saved: one-time review ask at 5+ entries.
+        maybeAskForReview({ totalEntries: countEntries() });
       }
     } else {
       updateEntry({
