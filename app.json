@@ -2,7 +2,7 @@
   "expo": {
     "name": "Inkwell",
     "slug": "inkwell",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "scheme": "inkwell",
     "owner": "boyscout1970",
@@ -14,7 +14,8 @@
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Inkwell lets you attach photos from your library to journal entries. Photos are copied into the app and never leave your device."
-      }
+      },
+      "buildNumber": "2"
     },
     "android": {
       "package": "com.inkwelljournal.app",
