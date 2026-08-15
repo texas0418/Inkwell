@@ -55,6 +55,7 @@ interface PhotoDraft {
   height: number;
 }
 
+// eslint-disable-next-line max-lines-per-function, complexity -- tech-debt #3
 export default function EditorScreen(props: {
   entryId: number | null;
   dayKey: string;
@@ -79,6 +80,7 @@ export default function EditorScreen(props: {
     if (props.entryId == null) return;
     const e = getEntry(props.entryId);
     if (e) {
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- tech-debt #4
       setTitle(e.title);
       setBody(e.body);
       setMood(e.mood);
@@ -299,7 +301,7 @@ export default function EditorScreen(props: {
 
         {showPrompt && (
           <Pressable style={styles.promptCard} onPress={() => setTitle(prompt)}>
-            <Text style={styles.promptLabel}>Today's prompt — tap to use</Text>
+            <Text style={styles.promptLabel}>Today&apos;s prompt — tap to use</Text>
             <Text style={styles.promptText}>{prompt}</Text>
           </Pressable>
         )}

@@ -42,6 +42,7 @@ export default function LockGate(props: { children: React.ReactNode }) {
   // Lock on cold start (once settings are loaded) …
   useEffect(() => {
     if (loaded && settings.lockEnabled) {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- tech-debt #4
       setLocked(true);
       tryUnlock();
     }
