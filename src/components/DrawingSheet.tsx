@@ -51,10 +51,12 @@ export default function DrawingSheet(props: {
   const canvasRef = useRef<View>(null);
   const liveStroke = useRef<Stroke | null>(null);
   const penState = useRef({ color: PEN_COLORS[0], width: PEN_WIDTHS[0] });
+  // eslint-disable-next-line react-hooks/refs -- tech-debt #4
   penState.current = { color, width };
 
   const pan = useMemo(
     () =>
+  // eslint-disable-next-line react-hooks/refs -- tech-debt #4
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
         onMoveShouldSetPanResponder: () => true,

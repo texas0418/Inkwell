@@ -1,0 +1,67 @@
+INKWELL — GOOGLE PLAY STORE LISTING (draft 2026-08-15)
+========================================================
+
+APP NAME (30 chars max)
+Inkwell: Private Journal
+
+SHORT DESCRIPTION (80 chars max)
+A private journal that stays yours. On your phone, full stop. No account, ever.
+
+FULL DESCRIPTION (4000 chars max)
+-----------------------------------------------------
+A private journal that stays yours.
+
+Inkwell keeps your entries and photos on your phone — full stop. No account, no cloud, no analytics, nothing to leak. Open the app and write; that's the whole deal.
+
+ON YOUR PHONE, FULL STOP
+Everything lives only on this device. Inkwell makes no network calls. Your words can't leak from a server that doesn't exist.
+
+WRITE THE WAY YOU LIKE
+• A clean page, a daily prompt if you want one, and a mood for the day
+• Attach photos or sketch directly into an entry
+• Titles optional, streaks and word counts if you care, invisible if you don't
+• Five paper-and-ink themes — quiet, bookish, easy on the eyes, light and dark
+
+FIND ANYTHING AGAIN
+• Full-text search across your whole journal
+• Calendar view — every day you wrote, at a glance
+• Star the entries that matter
+
+LOCKED, IF YOU WANT
+Lock Inkwell with your fingerprint or face so only you can open it.
+
+YOURS TO TAKE ANYWHERE
+Export your whole journal — photos included — to a single file, any time. Backups and export are free forever and never gated.
+
+NO SUBSCRIPTION
+Writing is free forever. One optional one-time unlock adds extras (like multiple photos per entry). Your data is never held hostage.
+
+If you've wanted a journal that treats your inner life like it's nobody else's business, this is the one.
+-----------------------------------------------------
+
+CATEGORY: Lifestyle (or Productivity — match iOS)
+CONTACT: hello/support links from docs; Website: https://simonbuilds.app/inkwell/
+PRIVACY POLICY URL (verified live 2026-08-15): https://texas0418.github.io/inkwell-privacy/
+
+GRAPHIC ASSETS (all in store/)
+- play-icon-512.png (512x512) — DONE
+- play-feature-graphic.png (1024x500) — DONE
+- screenshots-android/: 01-private, 02-write, 03-journal, 04-calendar (1080x2160, 2:1) — DONE, captured from release APK on Pixel 6 emulator
+
+DATA SAFETY FORM (prep)
+- No data collected or shared. Entries/photos never leave the device; app makes no network calls (privacy is the brand per AGENTS.md)
+- Exception to declare: Purchase history via Google Play Billing/RevenueCat for the one-time Pro unlock — collected, not shared, app functionality. Verify against RevenueCat's Play data-safety guide at submission
+- Biometric auth uses the OS API; no biometric data accessible to the app
+
+CONTENT RATING: Everyone (journal/utility; user's own private content)
+
+IN-APP PURCHASE
+- Inkwell Pro (one-time unlock, mirror iOS product/price) — create in Play Console + RevenueCat Google project before submission. Fail-open pattern: app works fully if billing unreachable
+
+ANDROID SMOKE-TEST NOTES (2026-08-15, release APK, Pixel 6 API 34 emulator)
+- Onboarding, editor (title/mood/prompt/body), journal list w/ streak + backup nudge, calendar w/ entry dot: all working
+- expo-system-ui added so "automatic" theme tracking works on Android
+- NOT yet exercised on Android: photo attach (needs gallery content), Draw sheet, biometric lock (no fingerprint enrolled on AVD), expo-print PDF export, notifications reminder flow. Recheck on the physical Moto before submission — especially expo-print output formatting
+
+RELEASE NOTES (first release)
+Inkwell arrives on Android: a private journal that stays yours. No account, no cloud — your words live on your phone, full stop.

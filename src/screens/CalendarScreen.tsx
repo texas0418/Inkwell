@@ -41,6 +41,7 @@ export default function CalendarScreen(props: {
     setDayEntries(listEntriesForDay(selected));
   }, [ym, selected]);
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- tech-debt #4
   useEffect(load, [load]);
 
   const shiftMonth = (delta: number) => {

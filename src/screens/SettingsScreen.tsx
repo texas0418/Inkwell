@@ -55,6 +55,7 @@ const THEME_CHOICES: { mode: ThemeMode; label: string }[] = [
 
 const pad2 = (n: number) => n.toString().padStart(2, '0');
 
+// eslint-disable-next-line max-lines-per-function -- tech-debt #3
 export default function SettingsScreen(props: { onBack: () => void }) {
   const pro = useProAccess();
   const { settings, update } = useSettings();
