@@ -40,7 +40,10 @@
       ],
       "expo-notifications",
       "expo-asset",
-      "expo-font"
+      "expo-font",
+      "./plugins/withReleaseSigning.js",
+      "expo-sharing",
+      "expo-sqlite"
     ]
   }
 }
