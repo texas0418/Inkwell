@@ -46,6 +46,7 @@ import {
   ThemeFonts,
   useTheme,
 } from '../theme';
+import MoreApps from '../components/MoreApps';
 
 const THEME_CHOICES: { mode: ThemeMode; label: string }[] = [
   { mode: 'system', label: 'System' },
@@ -435,6 +436,8 @@ export default function SettingsScreen(props: { onBack: () => void }) {
             )}
           </Pressable>
         </View>
+
+        <MoreApps />
 
         <Text style={styles.sectionTitle}>Danger zone</Text>
         <View style={styles.card}>
