@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import {
   ENTITLEMENT_ID,
+  IS_AMAZON_BUILD,
   PRODUCT_ID,
   isPlaceholderKey,
   keyForPlatform,
@@ -76,7 +77,7 @@ export async function initPurchases(): Promise<void> {
   }
 
   try {
-    Purchases.configure({ apiKey });
+    Purchases.configure({ apiKey, useAmazon: IS_AMAZON_BUILD });
     Purchases.addCustomerInfoUpdateListener((info: any) => {
       setPro(hasEntitlement(info));
     });
