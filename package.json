@@ -40,5 +40,14 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint ."
   },
-  "private": true
+  "private": true,
+  "expo": {
+    "install": {
+      "exclude": [
+        "expo",
+        "expo-dev-client",
+        "expo-sharing"
+      ]
+    }
+  }
 }
