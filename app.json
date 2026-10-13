@@ -30,7 +30,9 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Inkwell lets you attach photos from your library to journal entries. Photos are copied into the app and never leave your device."
+          "photosPermission": "Inkwell lets you attach photos from your library to journal entries. Photos are copied into the app and never leave your device.",
+          "cameraPermission": false,
+          "microphonePermission": false
         }
       ],
       [
@@ -43,6 +45,7 @@
       "expo-asset",
       "expo-font",
       "./plugins/withReleaseSigning.js",
+      "./plugins/withAmazonAuthKey.js",
       "expo-sharing",
       "expo-sqlite"
     ]
