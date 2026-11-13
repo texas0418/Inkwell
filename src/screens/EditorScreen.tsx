@@ -1,11 +1,13 @@
 // src/screens/EditorScreen.tsx
-// Write or edit one entry. Back = save (a journal never loses writing);
-// a brand-new entry that is still completely empty is simply not created.
+// Write or edit one entry. The entry saves itself while you write (a pause in
+// typing, the screen locking, the app going to the background) and again on
+// Done, so a journal never loses writing; a brand-new entry that is still
+// completely empty is simply not created.
 // Date & time are editable (tap the header date). Photos and drawings share
 // one attachment row and one limit: free tier = one per entry, Pro = unlimited
 // (fail-open in dev).
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Image,
@@ -47,6 +49,7 @@ import { useProAccess, purchasePro } from '../proAccess';
 import { Palette, ThemeFonts, useTheme } from '../theme';
 import DateTimeSheet from '../components/DateTimeSheet';
 import DrawingSheet from '../components/DrawingSheet';
+import { useAutosave } from '../useAutosave';
 
 interface PhotoDraft {
   rowId?: number; // set once persisted
@@ -64,7 +67,8 @@ export default function EditorScreen(props: {
   const pro = useProAccess();
   const { colors: c, fonts, statusBarStyle } = useTheme();
   const styles = useMemo(() => makeStyles(c, fonts), [c, fonts]);
-  const [entryId] = useState<number | null>(props.entryId);
+  // Set once the entry exists in the database (on open, or on its first save).
+  const savedId = useRef<number | null>(props.entryId);
   const [dayKey, setDayKey] = useState(props.dayKey);
   const [createdAtMs, setCreatedAtMs] = useState<number>(() => Date.now());
   const [title, setTitle] = useState('');
@@ -105,44 +109,49 @@ export default function EditorScreen(props: {
   const words = countWords(body) + countWords(title);
   const urls = useMemo(() => extractUrls(body), [body]);
   const prompt = useMemo(() => promptForDay(dayKey), [dayKey]);
-  const showPrompt = entryId == null && title === '' && body === '';
+  const showPrompt = props.entryId == null && title === '' && body === '';
+
+  /** Insert the entry once, then update it; register any unsaved attachments. */
+  const persist = () => {
+    const fields = {
+      dayKey,
+      createdAtMs,
+      updatedAtMs: Date.now(),
+      title: title.trim(),
+      body,
+      mood,
+      pinned,
+    };
+    if (savedId.current == null) {
+      if (isEmpty) return;
+      savedId.current = insertEntry(fields);
+    } else {
+      updateEntry({ id: savedId.current, ...fields });
+    }
+    const id = savedId.current;
+    photos.forEach((p, i) => {
+      // Mutated in place so a later remove or save sees the row id.
+      if (p.rowId == null) {
+        p.rowId = insertPhoto(id, { fileName: p.fileName, position: i, width: p.width, height: p.height });
+      }
+    });
+  };
+
+  const contentKey = JSON.stringify([title, body, mood, pinned, dayKey, createdAtMs, photos.length]);
+  const autosave = useAutosave(persist, contentKey, loaded);
 
   const saveAndClose = () => {
-    const now = Date.now();
-    if (entryId == null) {
-      if (!isEmpty) {
-        const id = insertEntry({
-          dayKey,
-          createdAtMs,
-          updatedAtMs: now,
-          title: title.trim(),
-          body,
-          mood,
-          pinned,
-        });
-        photos.forEach((p, i) =>
-          insertPhoto(id, {
-            fileName: p.fileName,
-            position: i,
-            width: p.width,
-            height: p.height,
-          }),
-        );
-        // After the entry is safely saved: one-time review ask at 5+ entries.
-        maybeAskForReview({ totalEntries: countEntries() });
-      }
+    autosave.stop();
+    const isNew = props.entryId == null;
+    if (isNew && isEmpty && savedId.current != null) {
+      // Autosaved earlier, then cleared: an empty new entry is not kept.
+      deleteEntry(savedId.current);
+      savedId.current = null;
     } else {
-      updateEntry({
-        id: entryId,
-        dayKey,
-        createdAtMs,
-        updatedAtMs: now,
-        title: title.trim(),
-        body,
-        mood,
-        pinned,
-      });
+      persist();
     }
+    // After the entry is safely saved: one-time review ask at 5+ entries.
+    if (isNew && savedId.current != null) maybeAskForReview({ totalEntries: countEntries() });
     props.onDone();
   };
 
@@ -153,8 +162,9 @@ export default function EditorScreen(props: {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
+          autosave.stop();
           for (const p of photos) await deletePhotoFile(p.fileName);
-          if (entryId != null) deleteEntry(entryId);
+          if (savedId.current != null) deleteEntry(savedId.current);
           props.onDone();
         },
       },
@@ -196,8 +206,8 @@ export default function EditorScreen(props: {
     try {
       const fileName = await importPhotoFile(srcUri);
       const draft: PhotoDraft = { fileName, width: w, height: h };
-      if (entryId != null) {
-        draft.rowId = insertPhoto(entryId, {
+      if (savedId.current != null) {
+        draft.rowId = insertPhoto(savedId.current, {
           fileName,
           position: photos.length,
           width: w,
@@ -364,7 +374,7 @@ export default function EditorScreen(props: {
           <Text style={styles.proHint}>More attachments per entry is a Pro feature.</Text>
         )}
 
-        {entryId != null && (
+        {props.entryId != null && (
           <Pressable onPress={confirmDelete} style={styles.deleteRow} hitSlop={8}>
             <Text style={styles.deleteText}>Delete entry</Text>
           </Pressable>
