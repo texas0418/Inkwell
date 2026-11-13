@@ -46,7 +46,12 @@
       "exclude": [
         "expo",
         "expo-dev-client",
-        "expo-sharing"
+        "expo-sharing",
+        "expo-asset",
+        "expo-constants",
+        "expo-image-picker",
+        "expo-notifications",
+        "expo-sqlite"
       ]
     }
   }
