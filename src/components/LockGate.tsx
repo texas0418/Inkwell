@@ -1,11 +1,12 @@
 // src/components/LockGate.tsx
-// Face ID / passcode gate. When lock is enabled, the journal blanks and
-// requires biometric (or device passcode fallback) on launch and whenever the
-// app returns from the background. Fail-open if the device has no biometrics
+// Face ID / passcode gate. When lock is enabled, a lock screen covers the
+// journal and requires biometric (or device passcode fallback) on launch and
+// whenever the app returns from the background. It covers the app instead of
+// replacing it, so an entry being written is still open after unlocking. Fail-open if the device has no biometrics
 // or none enrolled — never brick the user's own journal.
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useSettings } from '../SettingsContext';
 import { Palette, useTheme } from '../theme';
@@ -51,26 +52,41 @@ export default function LockGate(props: { children: React.ReactNode }) {
   // … and again whenever the app has been backgrounded.
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'background' && settings.lockEnabled) setLocked(true);
+      if (state === 'background' && settings.lockEnabled) {
+        Keyboard.dismiss();
+        setLocked(true);
+      }
     });
     return () => sub.remove();
   }, [settings.lockEnabled]);
 
-  if (!settings.lockEnabled || !locked) return <>{props.children}</>;
+  const showLock = settings.lockEnabled && locked;
 
   return (
-    <View style={styles.root}>
-      <Text style={[styles.logo, { fontFamily: fonts.title }]}>Inkwell</Text>
-      <Text style={styles.hint}>Your journal is locked.</Text>
-      <Pressable style={styles.btn} onPress={tryUnlock}>
-        <Text style={styles.btnText}>Unlock</Text>
-      </Pressable>
+    <View style={styles.fill}>
+      <View
+        style={styles.fill}
+        accessibilityElementsHidden={showLock}
+        importantForAccessibility={showLock ? 'no-hide-descendants' : 'auto'}
+      >
+        {props.children}
+      </View>
+      {showLock && (
+        <View style={[StyleSheet.absoluteFill, styles.root]}>
+          <Text style={[styles.logo, { fontFamily: fonts.title }]}>Inkwell</Text>
+          <Text style={styles.hint}>Your journal is locked.</Text>
+          <Pressable style={styles.btn} onPress={tryUnlock}>
+            <Text style={styles.btnText}>Unlock</Text>
+          </Pressable>
+        </View>
+      )}
     </View>
   );
 }
 
 const makeStyles = (c: Palette) =>
   StyleSheet.create({
+    fill: { flex: 1 },
     root: {
       flex: 1,
       backgroundColor: c.bg,
